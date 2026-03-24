@@ -19,6 +19,46 @@ export class APIService {
     }
   }
 
+  /**
+   * Distributes learning topics evenly across weeks
+   * @param learnings All available learning topics
+   * @param weekNumber Current week number (1-based)
+   * @returns Array of 2 topics for the given week
+   */
+  private getTopicsForWeek(
+    learnings: WeeklyLearnings,
+    weekNumber: number,
+  ): string[] {
+    const totalWeeks = this.config.endWeek - this.config.startWeek + 1;
+    const totalTopics = learnings.items.length;
+    
+    // Calculate topics per week
+    const topicsPerWeek = totalTopics / totalWeeks;
+    
+    // Calculate which topics this week should get (0-based week index)
+    const weekIndex = weekNumber - this.config.startWeek;
+    const startIndex = Math.floor(weekIndex * topicsPerWeek);
+    const endIndex = Math.floor((weekIndex + 1) * topicsPerWeek);
+    
+    // Get topics for this week (at least 1, at most 2)
+    const topics = learnings.items.slice(startIndex, endIndex);
+    
+    // Ensure we always return exactly 2 topics
+    if (topics.length === 0) {
+      // Fallback: use first 2 topics if calculation fails
+      return learnings.items.slice(0, 2);
+    } else if (topics.length === 1) {
+      // If only 1 topic, add the next one (circular)
+      const nextIndex = endIndex % totalTopics;
+      return [topics[0], learnings.items[nextIndex]];
+    } else if (topics.length > 2) {
+      // If more than 2, take first 2
+      return topics.slice(0, 2);
+    }
+    
+    return topics;
+  }
+
   private async waitForRateLimit(): Promise<void> {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
@@ -64,9 +104,8 @@ export class APIService {
     learnings: WeeklyLearnings,
     weekNumber: number,
   ): string {
-    // Randomly pick 2 topics from learnings for the entire week
-    const shuffled = [...learnings.items].sort(() => Math.random() - 0.5);
-    const selectedTopics = shuffled.slice(0, 2);
+    // Get evenly distributed topics for this week
+    const selectedTopics = this.getTopicsForWeek(learnings, weekNumber);
 
     const questionsList = questions.map((q, i) => `${i + 1}. ${q}`).join("\n");
 
@@ -181,9 +220,8 @@ Generate the JSON response now:`;
     learnings: WeeklyLearnings,
     weekNumber: number,
   ): string {
-    // Randomly pick 2 topics from learnings
-    const shuffled = [...learnings.items].sort(() => Math.random() - 0.5);
-    const selectedTopics = shuffled.slice(0, 2);
+    // Get evenly distributed topics for this week
+    const selectedTopics = this.getTopicsForWeek(learnings, weekNumber);
 
     return `You are writing a practice school diary entry for Week ${weekNumber}.
 
